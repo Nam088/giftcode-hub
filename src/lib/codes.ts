@@ -1,4 +1,4 @@
-export const MAX_CODES_PER_BATCH = 50;
+export const MAX_CODES_PER_BATCH = Number.POSITIVE_INFINITY;
 
 export interface ParsedCodes {
   valid: string[];

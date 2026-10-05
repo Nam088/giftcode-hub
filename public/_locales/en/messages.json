@@ -1,0 +1,9 @@
+{
+  "extName": { "message": "Gift Code Redeemer (unofficial)" },
+  "extDescription": {
+    "message": "Redeem gift codes you may use, one by one, on supported official redeem pages."
+  },
+  "actionTitle": { "message": "Open Gift Code Redeemer" },
+  "menuAddCodes": { "message": "Add codes to Gift Code Redeemer" },
+  "menuScanPage": { "message": "Scan codes on this page" }
+}

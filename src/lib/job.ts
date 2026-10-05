@@ -1,3 +1,6 @@
+import type { MessageKey } from './i18n/en';
+import type { SiteId } from './sites/types';
+
 export type ResultStatus = 'success' | 'invalid' | 'used' | 'expired';
 export type ItemStatus = 'pending' | 'inFlight' | 'unknown' | ResultStatus;
 export type JobStatus = 'running' | 'paused' | 'done';
@@ -23,14 +26,18 @@ export interface JobItem {
 
 export interface Job {
   id: string;
+  /** Missing on jobs written before sites were split; those were Delta Force Garena. */
+  siteId?: SiteId;
   tabId: number;
   /** Account name shown on the site when the job started, used to key known codes. */
   account: string;
   mode: RunMode;
   status: JobStatus;
   pauseReason?: PauseReason;
-  /** Extra detail for the pause, for example the error text. */
+  /** Raw text from the site that explains the pause, shown as is. */
   pauseDetail?: string;
+  /** Our own explanation of the pause, translated in the UI. */
+  pauseNote?: MessageKey;
   items: JobItem[];
   createdAt: number;
   finishedAt?: number;
@@ -96,7 +103,7 @@ export function recoverInterrupted(job: Job): Job {
     ...job,
     status: 'paused',
     pauseReason: 'needs_review',
-    pauseDetail: 'Phiên chạy trước bị gián đoạn',
+    pauseNote: 'note.interrupted',
     items: job.items.map((item) =>
       item.status === 'inFlight' ? { ...item, status: 'unknown' } : item,
     ),
@@ -107,9 +114,16 @@ export function nextPendingIndex(job: Job): number {
   return job.items.findIndex((item) => item.status === 'pending');
 }
 
-export function createJob(codes: string[], tabId: number, account: string, mode: RunMode): Job {
+export function createJob(
+  codes: string[],
+  tabId: number,
+  account: string,
+  mode: RunMode,
+  siteId: SiteId = 'df-garena',
+): Job {
   return {
     id: crypto.randomUUID(),
+    siteId,
     tabId,
     account,
     mode,

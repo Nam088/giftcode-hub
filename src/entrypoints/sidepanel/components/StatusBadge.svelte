@@ -1,6 +1,7 @@
 <script lang="ts">
+import { t } from '@/lib/i18n/index.svelte';
 import type { ItemStatus } from '@/lib/job';
-import { STATUS_LABEL, STATUS_TONE, type Tone } from '@/lib/labels';
+import { STATUS_TONE, type Tone } from '@/lib/labels';
 
 let { status }: { status: ItemStatus } = $props();
 
@@ -18,5 +19,5 @@ const TONE_CLASS: Record<Tone, string> = {
     STATUS_TONE[status]
   ]}"
 >
-  {STATUS_LABEL[status]}
+  {t(`status.${status}`)}
 </span>

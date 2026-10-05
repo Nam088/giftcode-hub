@@ -1,0 +1,9 @@
+{
+  "extName": { "message": "Gift Code Redeemer (không chính thức)" },
+  "extDescription": {
+    "message": "Đổi lần lượt các gift code bạn được phép dùng trên trang đổi quà chính thức được hỗ trợ."
+  },
+  "actionTitle": { "message": "Mở Gift Code Redeemer" },
+  "menuAddCodes": { "message": "Thêm code vào Gift Code Redeemer" },
+  "menuScanPage": { "message": "Quét code trên trang này" }
+}

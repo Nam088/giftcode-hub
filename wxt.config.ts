@@ -11,8 +11,9 @@ export default defineConfig({
   // The dev browser is launched by scripts/browser.ts so the login session persists
   webExt: { disabled: true },
   manifest: {
-    name: 'Gift Code Redeemer (unofficial)',
-    description: 'Redeem gift codes you own, one by one, on supported official redeem pages.',
+    name: '__MSG_extName__',
+    description: '__MSG_extDescription__',
+    default_locale: 'en',
     permissions: [
       'storage',
       'sidePanel',
@@ -21,7 +22,8 @@ export default defineConfig({
       'activeTab',
       'scripting',
     ],
-    host_permissions: ['https://redeem.df.garena.sg/*'],
-    action: { default_title: 'Open Gift Code Redeemer' },
+    // One entry per supported redeem page (see src/lib/sites)
+    host_permissions: ['https://redeem.df.garena.sg/*', 'https://www.playdeltaforce.com/*'],
+    action: { default_title: '__MSG_actionTitle__' },
   },
 });

@@ -19,10 +19,12 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "e2e": "node scripts/e2e.ts",
-    "scrape": "node scripts/scrape/index.ts"
+    "scrape": "node scripts/scrape/index.ts",
+    "gen:df-messages": "node scripts/gen-df-messages.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^26.6.4",

@@ -1,15 +1,15 @@
 import type { ContentRequest, ProbeResult, RedeemOutcome } from '@/lib/messages';
+import { findSiteForUrl, SITES } from '@/lib/sites';
 import { classify } from '@/lib/sites/classify';
-import { findSite } from '@/lib/sites/garenaDf';
 import type { SiteAdapter } from '@/lib/sites/types';
 
 /** Cancels the pending semi auto wait, if any. */
 let disarm: (() => void) | null = null;
 
 export default defineContentScript({
-  matches: ['https://redeem.df.garena.sg/*'],
+  matches: SITES.flatMap((site) => site.matches),
   main(ctx) {
-    const site = findSite(location.hostname);
+    const site = findSiteForUrl(location.href);
     if (!site) return;
 
     const onMessage = (
@@ -46,11 +46,17 @@ async function handle(site: SiteAdapter, request: ContentRequest) {
   }
 }
 
+/** Pages hide logged out or logged in blocks with display:none, so presence is not enough. */
+function isVisible(selector: string): boolean {
+  const el = document.querySelector<HTMLElement>(selector);
+  return !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+}
+
 function probe(site: SiteAdapter): ProbeResult {
   const account = document.querySelector(site.selectors.accountName)?.textContent?.trim() ?? '';
   return {
     hasForm: !!document.querySelector(site.selectors.input),
-    loggedIn: !!document.querySelector(site.selectors.loggedInMarker),
+    loggedIn: isVisible(site.selectors.loggedInMarker),
     account,
     captcha: !!document.querySelector(site.selectors.captcha),
     visible: document.visibilityState === 'visible',
@@ -59,7 +65,7 @@ function probe(site: SiteAdapter): ProbeResult {
 
 function fill(site: SiteAdapter, code: string): string | null {
   const input = document.querySelector<HTMLInputElement>(site.selectors.input);
-  if (!input) return 'Không tìm thấy ô nhập code';
+  if (!input) return 'input_missing';
   input.focus();
   input.value = code;
   input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -69,9 +75,9 @@ function fill(site: SiteAdapter, code: string): string | null {
 
 function precheck(site: SiteAdapter, code: string): { button: HTMLElement } | { error: string } {
   if (document.querySelector(site.selectors.captcha)) return { error: 'captcha' };
-  if (!document.querySelector(site.selectors.loggedInMarker)) return { error: 'login_required' };
+  if (!isVisible(site.selectors.loggedInMarker)) return { error: 'login_required' };
   const button = document.querySelector<HTMLElement>(site.selectors.submit);
-  if (!button) return { error: 'Không tìm thấy nút đổi' };
+  if (!button) return { error: 'submit_missing' };
   const fillError = fill(site, code);
   if (fillError) return { error: fillError };
   return { button };
@@ -118,6 +124,9 @@ function finish(site: SiteAdapter, message: string | null): RedeemOutcome {
   const status = classify(site, message);
   if (status === 'success' && site.selectors.dismiss) {
     document.querySelector<HTMLElement>(site.selectors.dismiss)?.click();
+  }
+  if (site.selectors.dismissToast) {
+    document.querySelector<HTMLElement>(site.selectors.dismissToast)?.click();
   }
   return { phase: 'after_submit', status, message };
 }

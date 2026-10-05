@@ -43,6 +43,10 @@
       document.querySelector('#diaTips .btn-close').addEventListener('click', () => {
         document.getElementById('diaTips').style.display = 'none';
       });
+      document.getElementById('superTips').addEventListener('click', () => {
+        toastBusy = false;
+        document.getElementById('superTips').textContent = '';
+      });
       document.querySelector('.btn-exchange').addEventListener('click', () => {
         const code = document.querySelector('.exc-input').value.trim();
         if (!code) return;

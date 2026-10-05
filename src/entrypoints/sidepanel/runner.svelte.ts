@@ -1,5 +1,7 @@
 import { appendToDraft, hashCode, maskCode } from '@/lib/codes';
 import { activeCodes, parseFeed } from '@/lib/feed';
+import type { MessageKey } from '@/lib/i18n/en';
+import { getLocale, isMessageKey, type Msg, setLocale, t } from '@/lib/i18n/index.svelte';
 import {
   countByStatus,
   createJob,
@@ -14,60 +16,74 @@ import {
   requeue,
   transition,
 } from '@/lib/job';
-import { PAUSE_LABEL } from '@/lib/labels';
 import { isNotDelivered, type ProbeResult, type RedeemOutcome, sendToTab } from '@/lib/messages';
-import { garenaDf } from '@/lib/sites/garenaDf';
+import { DEFAULT_SITE, getSite, isSiteId, type SiteAdapter, type SiteId } from '@/lib/sites';
 import {
   type Backup,
   clampDelay,
-  draftItem,
+  DEFAULT_SETTINGS,
+  draftsItem,
   FEED_AUTO_SYNC_MS,
   FEED_MAX_AGE_DAYS,
   type FeedSync,
   feedSyncItem,
+  feedUrlFor,
   type HistoryEntry,
   historyItem,
   inboxItem,
-  jobItem,
+  jobsItem,
   type KnownCodes,
   knownCodesItem,
+  knownKey,
+  legacyDraftItem,
+  legacyJobItem,
   MAX_HISTORY,
   MIN_DELAY_MS,
+  type PerSite,
   parseBackup,
   type Settings,
   settingsItem,
 } from '@/lib/storage';
 
-const SITE = garenaDf;
 /** How long semi auto mode waits for the user to press the site's button. */
 const ARM_TIMEOUT_MS = 5 * 60 * 1000;
 const RESULT_STATUSES: readonly string[] = ['success', 'invalid', 'used', 'expired'];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const msg = (key: MessageKey, params?: Msg['params']): Msg => ({ key, params });
 
 /**
  * Owns the redeem loop. Lives in the side panel, which stays alive while it is open,
  * unlike the MV3 service worker. Every state change is persisted so a closed panel
  * can be recovered with recoverInterrupted().
+ *
+ * Everything is kept per site (game + server): jobs, drafts, feed syncs and known codes,
+ * so Delta Force Garena and Global never mix. Only one site can run at a time.
  */
 export class Runner {
-  job = $state<Job | null>(null);
-  settings = $state<Settings>(settingsItem.fallback);
+  settings = $state<Settings>(DEFAULT_SETTINGS);
+  jobs = $state<PerSite<Job>>({});
+  drafts = $state<PerSite<string>>({});
+  feedSyncs = $state<PerSite<FeedSync>>({});
   history = $state<HistoryEntry[]>([]);
   known = $state<KnownCodes>({});
   probe = $state<ProbeResult | null>(null);
-  tabError = $state('');
+  tabError = $state<MessageKey | ''>('');
   /** Semi auto mode is waiting for the user to click on the page. */
   waitingForUser = $state(false);
   countdownMs = $state(0);
   currentIndex = $state(-1);
-  /** Unsent content of the code box, persisted so closing the panel keeps it. */
-  draft = $state('');
-  feedSync = $state<FeedSync | null>(null);
   feedBusy = $state(false);
 
+  site: SiteAdapter = $derived(getSite(this.settings.activeSite));
+  job: Job | null = $derived(this.jobs[this.settings.activeSite] ?? null);
+  draft: string = $derived(this.drafts[this.settings.activeSite] ?? '');
+  feedSync: FeedSync | null = $derived(this.feedSyncs[this.settings.activeSite] ?? null);
   counts = $derived(countByStatus(this.job?.items ?? []));
-  isActive = $derived(this.job !== null && this.job.status !== 'done');
+  /** The site whose job is running, if any; switching site is blocked meanwhile. */
+  runningSite: SiteId | undefined = $derived(
+    (Object.entries(this.jobs) as [SiteId, Job][]).find(([, j]) => j?.status === 'running')?.[0],
+  );
 
   #looping = false;
   #draftTimer: ReturnType<typeof setTimeout> | undefined;
@@ -75,24 +91,34 @@ export class Runner {
   #switchingMode = false;
 
   async init(): Promise<void> {
-    const [job, settings, history, known, draft] = await Promise.all([
-      jobItem.getValue(),
+    const [settings, jobs, drafts, feedSyncs, history, known] = await Promise.all([
       settingsItem.getValue(),
+      jobsItem.getValue(),
+      draftsItem.getValue(),
+      feedSyncItem.getValue(),
       historyItem.getValue(),
       knownCodesItem.getValue(),
-      draftItem.getValue(),
     ]);
     // Fill in fields added after the settings were first saved
-    this.settings = { ...settingsItem.fallback, ...settings };
-    this.draft = draft;
-    this.feedSync = await feedSyncItem.getValue();
+    this.settings = { ...DEFAULT_SETTINGS, ...settings };
+    if (!isSiteId(this.settings.activeSite)) this.settings.activeSite = DEFAULT_SITE;
+    setLocale(this.settings.locale);
+    this.drafts = drafts;
+    this.feedSyncs = feedSyncs;
     this.history = history;
     this.known = known;
-    if (job) {
-      this.job = recoverInterrupted(job);
-      if (this.job !== job) await this.#saveJob();
-      else this.#updateBadge();
+    await this.#migrateLegacy(jobs);
+
+    // A job found as running was interrupted (panel closed, browser restarted)
+    let recovered = false;
+    for (const [id, job] of Object.entries(jobs) as [SiteId, Job][]) {
+      const next = recoverInterrupted(job);
+      if (next !== job) recovered = true;
+      jobs[id] = next;
     }
+    this.jobs = jobs;
+    if (recovered) await this.#saveJobs();
+    else this.#updateBadge();
 
     await this.#takeInbox();
     inboxItem.watch(() => void this.#takeInbox());
@@ -105,13 +131,44 @@ export class Runner {
       if (info.status === 'complete') void this.refreshProbe();
     });
     await this.refreshProbe();
-    const stale = !this.feedSync || Date.now() - this.feedSync.at > FEED_AUTO_SYNC_MS;
-    if (this.settings.feedUrl && this.settings.autoSyncFeed && stale) void this.syncFeed();
+    this.#autoSync();
+  }
+
+  /** Moves pre split data (single job and draft) under Delta Force Garena, once. */
+  async #migrateLegacy(jobs: PerSite<Job>): Promise<void> {
+    const [legacyJob, legacyDraft] = await Promise.all([
+      legacyJobItem.getValue(),
+      legacyDraftItem.getValue(),
+    ]);
+    if (legacyJob && !jobs['df-garena']) {
+      jobs['df-garena'] = { ...legacyJob, siteId: 'df-garena' };
+      await jobsItem.setValue(jobs);
+    }
+    if (legacyDraft && !this.drafts['df-garena']) {
+      this.drafts['df-garena'] = legacyDraft;
+      await draftsItem.setValue($state.snapshot(this.drafts));
+    }
+    if (legacyJob) await legacyJobItem.removeValue();
+    if (legacyDraft) await legacyDraftItem.removeValue();
+  }
+
+  /** Switches game or server. Blocked while another site is running. */
+  async setSite(id: SiteId): Promise<void> {
+    if (this.runningSite || id === this.settings.activeSite) return;
+    await this.saveSettings({ activeSite: id });
+    this.probe = null;
+    await this.refreshProbe();
+    this.#autoSync();
+  }
+
+  async setLanguage(preference: Settings['locale']): Promise<void> {
+    setLocale(preference);
+    await this.saveSettings({ locale: preference });
   }
 
   /** Finds the redeem tab: the active one if it is a redeem page, otherwise the first one open. */
   async findTab(): Promise<number | undefined> {
-    const tabs = await browser.tabs.query({ url: `https://${SITE.hostname}/*` });
+    const tabs = await browser.tabs.query({ url: this.site.matches });
     return (tabs.find((tab) => tab.active) ?? tabs[0])?.id;
   }
 
@@ -119,7 +176,7 @@ export class Runner {
     const tabId = await this.findTab();
     if (tabId === undefined) {
       this.probe = null;
-      this.tabError = 'Chưa mở trang redeem';
+      this.tabError = 'conn.noTab';
       return;
     }
     try {
@@ -127,21 +184,21 @@ export class Runner {
       this.tabError = '';
     } catch {
       this.probe = null;
-      this.tabError = 'Hãy tải lại trang redeem';
+      this.tabError = 'conn.reload';
     }
   }
 
   async openRedeemPage(): Promise<void> {
     const tabId = await this.findTab();
     if (tabId !== undefined) await browser.tabs.update(tabId, { active: true });
-    else await browser.tabs.create({ url: `https://${SITE.hostname}/vi/cdkgarena.html` });
+    else await browser.tabs.create({ url: this.site.redeemUrl(getLocale()) });
   }
 
-  knownFor(account: string): Record<string, ResultStatus> {
-    return this.known[account] ?? {};
+  knownFor(account: string, siteId: SiteId = this.site.id): Record<string, ResultStatus> {
+    return this.known[knownKey(siteId, account)] ?? {};
   }
 
-  /** Splits codes into ones never seen on this account and ones that already have a result. */
+  /** Splits codes into ones never seen on this account and site and ones with a result. */
   async splitKnown(codes: string[], account: string) {
     const seen = this.knownFor(account);
     const fresh: string[] = [];
@@ -152,33 +209,35 @@ export class Runner {
     return { fresh, known };
   }
 
-  async start(codes: string[]): Promise<string | null> {
+  async start(codes: string[]): Promise<Msg | null> {
+    if (this.runningSite) return msg('msg.otherRunning');
     await this.refreshProbe();
     const tabId = await this.findTab();
-    if (tabId === undefined || !this.probe) return this.tabError || 'Chưa mở trang redeem';
-    if (!this.probe.loggedIn) return 'Hãy đăng nhập trên trang redeem trước';
-    if (codes.length === 0) return 'Không có code nào để chạy';
+    if (tabId === undefined || !this.probe) return msg(this.tabError || 'msg.noTab');
+    if (!this.probe.loggedIn) return msg('msg.notLoggedIn');
+    if (codes.length === 0) return msg('msg.noCodes');
 
-    const job = createJob(codes, tabId, this.probe.account, this.settings.mode);
-    this.job = { ...job, status: 'running', pauseReason: undefined };
-    await this.#saveJob();
+    const job = createJob(codes, tabId, this.probe.account, this.settings.mode, this.site.id);
+    this.#setJob({ ...job, status: 'running', pauseReason: undefined });
+    await this.#saveJobs();
     await browser.tabs.update(tabId, { active: true });
     void this.#loop();
     return null;
   }
 
   async resume(): Promise<void> {
-    if (this.job?.status !== 'paused') return;
+    if (this.job?.status !== 'paused' || this.runningSite) return;
     const tabId = await this.findTab();
     if (tabId === undefined) {
-      this.tabError = 'Chưa mở trang redeem';
+      this.tabError = 'conn.noTab';
       return;
     }
     this.job.tabId = tabId;
     this.job.status = 'running';
     this.job.pauseReason = undefined;
     this.job.pauseDetail = undefined;
-    await this.#saveJob();
+    this.job.pauseNote = undefined;
+    await this.#saveJobs();
     await browser.tabs.update(tabId, { active: true });
     void this.#loop();
   }
@@ -195,8 +254,8 @@ export class Runner {
 
   async clearJob(): Promise<void> {
     if (this.job?.status === 'running') return;
-    this.job = null;
-    await jobItem.setValue(null);
+    this.#setJob(null);
+    await this.#saveJobs();
   }
 
   /** User checked the site and wants to try an unknown code again. */
@@ -204,12 +263,8 @@ export class Runner {
     const item = this.job?.items[index];
     if (!this.job || !item) return;
     this.job.items[index] = requeue(item);
-    if (this.job.status === 'done') {
-      this.job.status = 'paused';
-      this.job.pauseReason = 'user';
-      this.job.finishedAt = undefined;
-    }
-    await this.#saveJob();
+    this.#reopenIfDone();
+    await this.#saveJobs();
   }
 
   /** User checked the site and records the real result of an unknown code. */
@@ -217,8 +272,8 @@ export class Runner {
     const item = this.job?.items[index];
     if (!this.job || !item) return;
     this.job.items[index] = transition(item, status, item.message);
-    await this.#remember(this.job.account, item.code, status);
-    await this.#saveJob();
+    await this.#remember(this.site.id, this.job.account, item.code, status);
+    await this.#saveJobs();
   }
 
   async saveSettings(patch: Partial<Settings>): Promise<void> {
@@ -228,9 +283,10 @@ export class Runner {
     await settingsItem.setValue($state.snapshot(next));
   }
 
+  /** Forgets known codes of one account on the active site, or everything. */
   async forgetKnown(account?: string): Promise<void> {
     if (account === undefined) this.known = {};
-    else delete this.known[account];
+    else delete this.known[knownKey(this.site.id, account)];
     await knownCodesItem.setValue($state.snapshot(this.known));
   }
 
@@ -240,15 +296,18 @@ export class Runner {
   }
 
   async wipeAll(): Promise<void> {
-    if (this.job?.status === 'running') return;
-    this.job = null;
+    if (this.runningSite) return;
+    this.jobs = {};
     this.known = {};
     this.history = [];
+    this.feedSyncs = {};
     await Promise.all([
-      jobItem.setValue(null),
+      jobsItem.setValue({}),
       knownCodesItem.setValue({}),
       historyItem.setValue([]),
+      feedSyncItem.setValue({}),
     ]);
+    this.#updateBadge();
   }
 
   /**
@@ -259,7 +318,7 @@ export class Runner {
     await this.saveSettings({ mode });
     if (!this.job || this.job.status === 'done' || this.job.mode === mode) return;
     this.job.mode = mode;
-    await this.#saveJob();
+    await this.#saveJobs();
     if (this.waitingForUser) {
       this.#switchingMode = true;
       await this.#disarm();
@@ -267,29 +326,36 @@ export class Runner {
   }
 
   /**
-   * Pulls the public feed and adds codes to the code box. Duplicates are removed in
+   * Pulls the active site's feed and adds codes to its code box. Duplicates are removed in
    * three places: the feed itself is keyed by code, codes already in the box are not
-   * added twice, and codes with a result on this account (known hashes) are skipped.
+   * added twice, and codes with a result on this account and site are skipped.
    */
-  async syncFeed(): Promise<string> {
-    const url = this.settings.feedUrl.trim();
-    if (!url) return 'Chưa cấu hình nguồn code trong Cài đặt';
-    if (!/^https:\/\//.test(url)) return 'Nguồn code phải là link https';
+  async syncFeed(): Promise<Msg> {
+    const base = this.settings.feedBaseUrl.trim();
+    if (!base) return msg('msg.feedNotSet');
+    if (!/^https:\/\//.test(base)) return msg('msg.feedHttps');
+    const site = this.site;
     this.feedBusy = true;
     try {
-      const response = await fetch(url, { cache: 'no-store' });
-      if (!response.ok) return `Không tải được nguồn code (HTTP ${response.status})`;
-      const feed = parseFeed(await response.text(), SITE.codeFormat);
+      const response = await fetch(feedUrlFor(base, site.feedKey), { cache: 'no-store' });
+      if (!response.ok) return msg('msg.feedHttp', { status: response.status });
+      const feed = parseFeed(await response.text(), site.codeFormat);
       const codes = activeCodes(feed, FEED_MAX_AGE_DAYS);
       const { fresh, known } = await this.splitKnown(codes, this.probe?.account ?? '');
       const count = (text: string) => text.split(/\s+/).filter(Boolean).length;
       const before = count(this.draft);
       await this.setDraft(appendToDraft(this.draft, fresh), true);
-      this.feedSync = { at: Date.now(), active: codes.length, added: count(this.draft) - before };
-      await feedSyncItem.setValue($state.snapshot(this.feedSync));
-      return `Nguồn có ${codes.length} code còn mới. Thêm ${this.feedSync.added}, bỏ qua ${known.length} đã xử lý`;
+      const sync = { at: Date.now(), active: codes.length, added: count(this.draft) - before };
+      this.feedSyncs[site.id] = sync;
+      await feedSyncItem.setValue($state.snapshot(this.feedSyncs));
+      return msg('msg.feedResult', {
+        active: codes.length,
+        added: sync.added,
+        known: known.length,
+      });
     } catch (error) {
-      return error instanceof Error ? error.message : String(error);
+      const text = error instanceof Error ? error.message : String(error);
+      return isMessageKey(text) ? msg(text) : msg('pause.error');
     } finally {
       this.feedBusy = false;
     }
@@ -297,15 +363,16 @@ export class Runner {
 
   /** Typing is debounced; programmatic changes (feed, import, start) pass immediate. */
   setDraft(value: string, immediate = false): Promise<void> {
-    this.draft = value;
+    this.drafts[this.site.id] = value;
     clearTimeout(this.#draftTimer);
-    if (immediate) return draftItem.setValue(value);
-    this.#draftTimer = setTimeout(() => void draftItem.setValue(value), 300);
+    const save = () => draftsItem.setValue($state.snapshot(this.drafts));
+    if (immediate) return save();
+    this.#draftTimer = setTimeout(() => void save(), 300);
     return Promise.resolve();
   }
 
   /** Starts a new job with the codes a finished job never got to. */
-  async continueRemaining(): Promise<string | null> {
+  async continueRemaining(): Promise<Msg | null> {
     const codes = (this.job?.items ?? []).filter((i) => i.status === 'pending').map((i) => i.code);
     return this.start(codes);
   }
@@ -316,12 +383,8 @@ export class Runner {
     this.job.items = this.job.items.map((item) =>
       item.status === 'unknown' ? requeue(item) : item,
     );
-    if (this.job.status === 'done') {
-      this.job.status = 'paused';
-      this.job.pauseReason = 'user';
-      this.job.finishedAt = undefined;
-    }
-    await this.#saveJob();
+    this.#reopenIfDone();
+    await this.#saveJobs();
   }
 
   exportBackup(): Backup {
@@ -336,23 +399,41 @@ export class Runner {
   }
 
   /** Merges a backup: known codes are combined, history is deduped by id. */
-  async importBackup(text: string): Promise<string> {
+  async importBackup(text: string): Promise<Msg> {
     const backup = parseBackup(text);
-    for (const [account, codes] of Object.entries(backup.knownCodes)) {
-      this.known[account] = { ...codes, ...this.knownFor(account) };
+    for (const [key, codes] of Object.entries(backup.knownCodes)) {
+      this.known[key] = { ...codes, ...this.known[key] };
     }
     const ids = new Set(this.history.map((h) => h.id));
     this.history = [...this.history, ...backup.history.filter((h) => !ids.has(h.id))]
       .sort((a, b) => b.finishedAt - a.finishedAt)
       .slice(0, MAX_HISTORY);
     this.settings = backup.settings;
+    setLocale(this.settings.locale);
     await Promise.all([
       knownCodesItem.setValue($state.snapshot(this.known)),
       historyItem.setValue($state.snapshot(this.history)),
       settingsItem.setValue($state.snapshot(this.settings)),
     ]);
     const total = Object.values(backup.knownCodes).reduce((n, c) => n + Object.keys(c).length, 0);
-    return `Đã nhập ${total} code đã xử lý và ${backup.history.length} lượt lịch sử`;
+    return msg('msg.backupImported', { known: total, history: backup.history.length });
+  }
+
+  #setJob(job: Job | null): void {
+    if (job) this.jobs[job.siteId ?? this.site.id] = job;
+    else delete this.jobs[this.site.id];
+  }
+
+  #reopenIfDone(): void {
+    if (this.job?.status !== 'done') return;
+    this.job.status = 'paused';
+    this.job.pauseReason = 'user';
+    this.job.finishedAt = undefined;
+  }
+
+  #autoSync(): void {
+    const stale = !this.feedSync || Date.now() - this.feedSync.at > FEED_AUTO_SYNC_MS;
+    if (this.settings.feedBaseUrl && this.settings.autoSyncFeed && stale) void this.syncFeed();
   }
 
   async #takeInbox(): Promise<void> {
@@ -364,13 +445,14 @@ export class Runner {
 
   /** Toolbar badge: progress while running, "!" when a pause needs attention. */
   #updateBadge(): void {
-    const job = this.job;
+    const jobs = Object.values(this.jobs) as Job[];
+    const running = jobs.find((j) => j.status === 'running');
     let text = '';
     let color = '#0ff796';
-    if (job?.status === 'running') {
-      const done = job.items.filter((i) => isTerminal(i.status) || i.status === 'unknown').length;
-      text = `${done}/${job.items.length}`.slice(0, 5);
-    } else if (job?.status === 'paused' && job.pauseReason !== 'user') {
+    if (running) {
+      const done = running.items.filter((i) => isTerminal(i.status) || i.status === 'unknown');
+      text = `${done.length}/${running.items.length}`.slice(0, 5);
+    } else if (jobs.some((j) => j.status === 'paused' && j.pauseReason !== 'user')) {
       text = '!';
       color = '#ffc53d';
     }
@@ -385,7 +467,7 @@ export class Runner {
       .create({
         type: 'basic',
         iconUrl: browser.runtime.getURL('/icon/128.png'),
-        title,
+        title: `${title} · ${t(`site.${this.site.id}`)}`,
         message,
       })
       .catch(() => undefined);
@@ -397,6 +479,7 @@ export class Runner {
     try {
       while (this.job?.status === 'running') {
         const job = this.job;
+        const siteId = job.siteId ?? this.site.id;
         const index = nextPendingIndex(job);
         if (index === -1) {
           await this.#finish();
@@ -419,7 +502,7 @@ export class Runner {
           this.#pause('captcha');
           break;
         }
-        if (job.mode === 'auto' && !probe.visible) {
+        if (job.mode === 'auto' && !probe.visible && !this.settings.allowBackground) {
           this.#pause('tab_hidden');
           break;
         }
@@ -427,7 +510,7 @@ export class Runner {
         const item = job.items[index] as JobItem;
         this.currentIndex = index;
         job.items[index] = transition(item, 'inFlight');
-        await this.#saveJob();
+        await this.#saveJobs();
 
         let outcome: RedeemOutcome;
         try {
@@ -448,9 +531,9 @@ export class Runner {
             this.#pause('tab_lost');
           } else {
             job.items[index] = transition(job.items[index] as JobItem, 'unknown', String(error));
-            this.#pause('needs_review', 'Trang bị tải lại hoặc đóng khi đang chờ kết quả');
+            this.#pause('needs_review', undefined, 'note.reloaded');
           }
-          await this.#saveJob();
+          await this.#saveJobs();
           break;
         } finally {
           this.waitingForUser = false;
@@ -463,25 +546,27 @@ export class Runner {
           if (outcome.error === 'cancelled' && this.#switchingMode) {
             // Nothing was submitted; retry the same code right away in the new mode
             this.#switchingMode = false;
-            await this.#saveJob();
+            await this.#saveJobs();
             continue;
           }
           if (outcome.error === 'cancelled') {
-            if (job.status === 'running') this.#pause('user', 'Hết thời gian chờ bấm nút');
+            if (job.status === 'running') this.#pause('user', undefined, 'note.armTimeout');
           } else if (outcome.error === 'captcha' || outcome.error === 'login_required') {
             this.#pause(outcome.error);
           } else {
-            this.#pause('error', outcome.error);
+            const note = `note.${outcome.error}`;
+            if (isMessageKey(note)) this.#pause('error', undefined, note);
+            else this.#pause('error', outcome.error);
           }
-          await this.#saveJob();
+          await this.#saveJobs();
           break;
         }
 
         if (RESULT_STATUSES.includes(outcome.status)) {
           const status = outcome.status as ResultStatus;
           job.items[index] = transition(current, status, outcome.message);
-          await this.#remember(job.account, item.code, status);
-          await this.#saveJob();
+          await this.#remember(siteId, job.account, item.code, status);
+          await this.#saveJobs();
         } else {
           job.items[index] = transition(current, 'unknown', outcome.message);
           const reason: PauseReason =
@@ -490,8 +575,9 @@ export class Runner {
               : outcome.status === 'rate_limited'
                 ? 'rate_limited'
                 : 'needs_review';
-          this.#pause(reason, outcome.message || 'Trang không trả về thông báo');
-          await this.#saveJob();
+          if (outcome.message) this.#pause(reason, outcome.message);
+          else this.#pause(reason, undefined, 'note.noMessage');
+          await this.#saveJobs();
           break;
         }
 
@@ -515,18 +601,21 @@ export class Runner {
     this.countdownMs = 0;
   }
 
-  #pause(reason: PauseReason, detail?: string): void {
+  #pause(reason: PauseReason, detail?: string, note?: MessageKey): void {
     if (!this.job || this.job.status === 'done') return;
     this.job.status = 'paused';
     this.job.pauseReason = reason;
     this.job.pauseDetail = detail;
+    this.job.pauseNote = note;
     if (reason === 'user') void this.#disarm();
-    else
+    else {
+      const extra = detail ?? (note ? t(note) : '');
       this.#notify(
-        'Đã tạm dừng',
-        detail ? `${PAUSE_LABEL[reason]}. ${detail}` : PAUSE_LABEL[reason],
+        t('notify.paused'),
+        extra ? `${t(`pause.${reason}`)}. ${extra}` : t(`pause.${reason}`),
       );
-    void this.#saveJob();
+    }
+    void this.#saveJobs();
   }
 
   async #disarm(): Promise<void> {
@@ -547,6 +636,7 @@ export class Runner {
     }
     const entry: HistoryEntry = {
       id: job.id,
+      siteId: job.siteId ?? this.site.id,
       account: job.account,
       mode: job.mode,
       startedAt: job.createdAt,
@@ -556,21 +646,26 @@ export class Runner {
     };
     this.history = [entry, ...this.history.filter((h) => h.id !== job.id)].slice(0, MAX_HISTORY);
     this.#notify(
-      'Đã xong lượt đổi code',
-      `${entry.counts.success} thành công, ${entry.counts.used} đã dùng, ${entry.counts.invalid + entry.counts.expired} lỗi`,
+      t('notify.done'),
+      t('notify.doneBody', {
+        success: entry.counts.success,
+        used: entry.counts.used,
+        failed: entry.counts.invalid + entry.counts.expired,
+      }),
     );
-    await Promise.all([this.#saveJob(), historyItem.setValue($state.snapshot(this.history))]);
+    await Promise.all([this.#saveJobs(), historyItem.setValue($state.snapshot(this.history))]);
   }
 
-  async #remember(account: string, code: string, status: ResultStatus): Promise<void> {
+  async #remember(siteId: SiteId, account: string, code: string, status: ResultStatus) {
     const hash = await hashCode(code);
-    this.known[account] = { ...this.knownFor(account), [hash]: status };
+    const key = knownKey(siteId, account);
+    this.known[key] = { ...this.known[key], [hash]: status };
     await knownCodesItem.setValue($state.snapshot(this.known));
   }
 
-  async #saveJob(): Promise<void> {
+  async #saveJobs(): Promise<void> {
     this.#updateBadge();
-    await jobItem.setValue(this.job ? $state.snapshot(this.job) : null);
+    await jobsItem.setValue($state.snapshot(this.jobs));
   }
 }
 

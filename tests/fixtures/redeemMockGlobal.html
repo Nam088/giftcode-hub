@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Redeem mock (global)</title>
+  </head>
+  <body>
+    <!-- Mirrors playdeltaforce.com/en/cdkredeem.html after login: CDK tab, no UID form -->
+    <div id="unlogin" style="display: none"><a id="btn-login" href="#">Log in</a></div>
+    <div id="logined" class="logined"><span class="username">Tester</span> <a id="btn-logout" href="#">Log out</a></div>
+    <ul class="dh-input">
+      <li class="state state-after uid-content" style="display: none"><span>UID</span> <input id="uid" class="exc-input" type="text" /></li>
+      <li class="state state-after cdk-content"><span>CDK</span> <input class="exc-input" id="cdkey" type="text" /></li>
+    </ul>
+    <a href="#" class="btn-exchange" id="btn-redeem">Redeem</a>
+    <p class="super-tips" id="superTips"></p>
+    <div class="dia dia-tips" id="diaTips"><a href="#" class="btn-close"><i class="spr btn-close-i"></i></a><p></p></div>
+    <script>
+      const responses = {
+        GUSED001: 'You have already claimed this reward.',
+        GBAD0001: 'The CDKey entered is not valid. Please try again.',
+      };
+      let toastBusy = false;
+      function setSuperTips(text) {
+        if (toastBusy) return;
+        toastBusy = true;
+        document.getElementById('superTips').textContent = text;
+        setTimeout(() => (toastBusy = false), 2200);
+      }
+      function setDiaTips(text) {
+        const dialog = document.getElementById('diaTips');
+        dialog.querySelector('p').textContent = text;
+        dialog.style.display = 'block';
+      }
+      document.querySelector('#diaTips .btn-close').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('diaTips').style.display = 'none';
+      });
+      document.getElementById('superTips').addEventListener('click', () => {
+        toastBusy = false;
+        document.getElementById('superTips').textContent = '';
+      });
+      document.getElementById('btn-redeem').addEventListener('click', (e) => {
+        e.preventDefault();
+        const code = document.getElementById('cdkey').value.trim();
+        if (!code) return;
+        setTimeout(() => {
+          if (code in responses) setSuperTips(responses[code]);
+          else setDiaTips('Successfully claimed! Please check your in-game mail.');
+        }, 400);
+      });
+    </script>
+  </body>
+</html>

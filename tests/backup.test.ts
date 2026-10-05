@@ -15,7 +15,8 @@ describe('parseBackup', () => {
     const backup = parseBackup(JSON.stringify(valid));
     expect(backup.settings.mode).toBe('semi');
     expect(backup.settings.notify).toBe(true);
-    expect(backup.knownCodes.Nam?.abc).toBe('used');
+    // Old backups without a site prefix land under Delta Force Garena
+    expect(backup.knownCodes['df-garena:Nam']?.abc).toBe('used');
   });
 
   it('never lets a backup lower the delay floor', () => {

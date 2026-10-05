@@ -7,7 +7,7 @@ import {
   parseFeed,
   updateSourceStats,
 } from '@/lib/feed';
-import { extractFromTables, robotsAllows } from '../scripts/scrape/extract';
+import { extractCodes, extractFromTables, robotsAllows } from '../scripts/scrape/extract';
 
 const FORMAT = /^[A-Za-z0-9-]{4,64}$/;
 
@@ -126,5 +126,31 @@ describe('updateSourceStats', () => {
   it('keeps a source that failed today untouched', () => {
     const day1 = updateSourceStats(undefined, { a: ['X1'] }, '2026-10-05');
     expect(updateSourceStats(day1, {}, '2026-10-06').a?.lastChanged).toBe('2026-10-05');
+  });
+});
+
+describe('extractCodes', () => {
+  const html = `<nav><ul><li>Download</li></ul></nav>
+    <ul>
+      <li><strong>DFWizard309</strong>: weapon skin</li>
+      <li>DELTAFORCE2026 – M4A1 camo</li>
+      <li>Share on WhatsApp</li>
+      <li>WhatsApp</li>
+      <li>TOPUPlive</li>
+    </ul>
+    <table><tr><td>TrickOrTreat</td><td>expired</td></tr></table>`;
+
+  it('reads tables only unless lists are enabled', () => {
+    expect(extractCodes(html).map((c) => c.code)).toEqual(['TrickOrTreat']);
+  });
+
+  it('reads leading codes from list items and skips brands and ignored words', () => {
+    const codes = extractCodes(html, { lists: true, ignore: ['TOPUPlive'] });
+    expect(codes.map((c) => c.code).sort()).toEqual([
+      'DELTAFORCE2026',
+      'DFWizard309',
+      'TrickOrTreat',
+    ]);
+    expect(codes.find((c) => c.code === 'TrickOrTreat')?.expired).toBe(true);
   });
 });

@@ -1,5 +1,8 @@
 <script lang="ts">
 import { onMount } from 'svelte';
+import type { MessageKey } from '@/lib/i18n/en';
+import { t } from '@/lib/i18n/index.svelte';
+import { SITES } from '@/lib/sites';
 import { runner } from './runner.svelte';
 import HistoryTab from './tabs/HistoryTab.svelte';
 import RedeemTab from './tabs/RedeemTab.svelte';
@@ -8,15 +11,19 @@ import SettingsTab from './tabs/SettingsTab.svelte';
 
 type TabId = 'redeem' | 'results' | 'history' | 'settings';
 
-const TABS: { id: TabId; label: string; icon: string }[] = [
+const TABS: { id: TabId; label: MessageKey; icon: string }[] = [
   {
     id: 'redeem',
-    label: 'Đổi code',
+    label: 'tab.redeem',
     icon: 'M12 3v4M12 17v4M3 12h4M17 12h4M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8z',
   },
-  { id: 'results', label: 'Kết quả', icon: 'M4 6h16M4 12h16M4 18h10' },
-  { id: 'history', label: 'Lịch sử', icon: 'M12 7v5l3 2M21 12a9 9 0 1 1-9-9a9 9 0 0 1 9 9z' },
-  { id: 'settings', label: 'Cài đặt', icon: 'M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4' },
+  { id: 'results', label: 'tab.results', icon: 'M4 6h16M4 12h16M4 18h10' },
+  {
+    id: 'history',
+    label: 'tab.history',
+    icon: 'M12 7v5l3 2M21 12a9 9 0 1 1-9-9a9 9 0 0 1 9 9z',
+  },
+  { id: 'settings', label: 'tab.settings', icon: 'M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4' },
 ];
 
 let active = $state<TabId>('redeem');
@@ -30,13 +37,14 @@ onMount(async () => {
 const probe = $derived(runner.probe);
 const connection = $derived(
   probe?.loggedIn
-    ? { tone: 'ok', text: probe.account || 'Đã đăng nhập' }
+    ? { tone: 'ok', text: probe.account || t('conn.loggedIn') }
     : probe
-      ? { tone: 'warn', text: 'Chưa đăng nhập' }
-      : { tone: 'off', text: runner.tabError || 'Đang kiểm tra' },
+      ? { tone: 'warn', text: t('conn.notLoggedIn') }
+      : { tone: 'off', text: runner.tabError ? t(runner.tabError) : t('conn.checking') },
 );
 const resultBadge = $derived(runner.job ? runner.job.items.length : 0);
 const needsReview = $derived(runner.counts.unknown > 0);
+const siteLocked = $derived(runner.runningSite !== undefined);
 </script>
 
 <div class="flex min-h-screen flex-col">
@@ -49,8 +57,8 @@ const needsReview = $derived(runner.counts.unknown > 0);
           <path d="M12 8v8M8 12h8" />
         </svg>
         <div class="leading-none">
-          <div class="text-sm font-bold tracking-[0.2em] uppercase">Gift Code</div>
-          <div class="text-[9px] tracking-[0.35em] text-df-dim uppercase">Redeem terminal</div>
+          <div class="text-sm font-bold tracking-[0.2em] uppercase">{t('app.title')}</div>
+          <div class="text-[9px] tracking-[0.35em] text-df-dim uppercase">{t('app.subtitle')}</div>
         </div>
       </div>
 
@@ -60,7 +68,7 @@ const needsReview = $derived(runner.counts.unknown > 0);
           : connection.tone === 'warn'
             ? 'border-df-warn/40 text-df-warn'
             : 'border-df-line text-df-dim'}"
-        title="Mở trang redeem"
+        title={t('app.openRedeem')}
         onclick={() => runner.openRedeemPage()}
       >
         <span
@@ -72,6 +80,23 @@ const needsReview = $derived(runner.counts.unknown > 0);
         ></span>
         <span class="max-w-28 truncate">{connection.text}</span>
       </button>
+    </div>
+
+    <!-- Game and server: everything below is scoped to this choice -->
+    <div class="px-3 pb-2">
+      <label class="sr-only" for="site-select">{t('site.label')}</label>
+      <select
+        id="site-select"
+        class="hud-input px-2 py-1 text-xs font-semibold tracking-wider uppercase disabled:opacity-50"
+        value={runner.settings.activeSite}
+        disabled={siteLocked}
+        title={siteLocked ? t('site.locked') : t('site.label')}
+        onchange={(event) => runner.setSite(event.currentTarget.value as typeof runner.settings.activeSite)}
+      >
+        {#each SITES as site (site.id)}
+          <option value={site.id}>{t(`site.${site.id}`)}</option>
+        {/each}
+      </select>
     </div>
 
     <!-- Tabs -->
@@ -87,7 +112,7 @@ const needsReview = $derived(runner.counts.unknown > 0);
           <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">
             <path d={tab.icon} />
           </svg>
-          <span>{tab.label}</span>
+          <span>{t(tab.label)}</span>
           {#if tab.id === 'results' && resultBadge}
             <span
               class="absolute top-1 right-2 min-w-4 px-1 text-[9px] leading-4 {needsReview
@@ -107,7 +132,7 @@ const needsReview = $derived(runner.counts.unknown > 0);
 
   <main class="flex flex-1 flex-col gap-3 p-3">
     {#if !ready}
-      <div class="hud-label py-10 text-center">Đang tải…</div>
+      <div class="hud-label py-10 text-center">{t('app.loading')}</div>
     {:else if active === 'redeem'}
       <RedeemTab onShowResults={() => (active = 'results')} />
     {:else if active === 'results'}
@@ -120,6 +145,6 @@ const needsReview = $derived(runner.counts.unknown > 0);
   </main>
 
   <footer class="border-t border-df-line px-3 py-2 text-center text-[9px] tracking-widest text-df-dim uppercase">
-    Công cụ không chính thức · Chỉ dùng cho code hợp lệ
+    {t('app.footer')}
   </footer>
 </div>

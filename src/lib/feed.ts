@@ -137,10 +137,10 @@ export function serializeFeed(feed: Feed): string {
 export function parseFeed(text: string, format: RegExp): Feed {
   const data = JSON.parse(text) as Partial<Feed>;
   if (data.version !== 1 || !data.codes || typeof data.codes !== 'object') {
-    throw new Error('Nguồn code không đúng định dạng');
+    throw new Error('msg.feedInvalid');
   }
   const entries = Object.entries(data.codes);
-  if (entries.length > FEED_MAX_CODES) throw new Error('Nguồn code quá lớn');
+  if (entries.length > FEED_MAX_CODES) throw new Error('msg.feedTooLarge');
   const codes: Record<string, FeedEntry> = {};
   for (const [code, entry] of entries) {
     if (!format.test(code) || typeof entry?.lastSeen !== 'string') continue;
