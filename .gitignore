@@ -28,3 +28,4 @@ web-ext.config.ts
 # Local browser profile and page captures (may contain account data)
 .chrome-profile
 captures
+scratch

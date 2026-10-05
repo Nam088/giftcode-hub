@@ -56,37 +56,41 @@ const hasKnown = $derived(!!runner.known[knownKey(runner.site.id, account)]);
 const running = $derived(!!runner.runningSite);
 </script>
 
-<section class="hud-panel p-3">
-  <label class="hud-label mb-1.5 block" for="language">{t('settings.language')}</label>
-  <Select
-    id="language"
-    icon="language"
-    size="md"
-    value={runner.settings.locale}
-    options={LANGUAGE_OPTIONS.map((opt) => ({
-      value: opt,
-      label: opt === 'auto' ? t('settings.languageAuto') : LOCALE_NAMES[opt],
-    }))}
-    onchange={(val) => runner.setLanguage(val as LocalePreference)}
-  />
-</section>
-
-<section class="hud-panel p-3">
-  <div class="hud-label mb-1">{t('settings.speed')}</div>
-  <div class="flex items-center justify-between py-2">
-    <span class="text-sm">{t('settings.delay')}</span>
-    <span class="glow-text font-mono text-sm">{delaySeconds}s</span>
+<section class="hud-panel relative z-20 flex flex-col gap-3 p-3">
+  <div>
+    <label class="hud-label mb-1.5 block" for="language">{t('settings.language')}</label>
+    <Select
+      id="language"
+      icon="language"
+      size="md"
+      value={runner.settings.locale}
+      options={LANGUAGE_OPTIONS.map((opt) => ({
+        value: opt,
+        label: opt === 'auto' ? t('settings.languageAuto') : LOCALE_NAMES[opt],
+      }))}
+      onchange={(val) => runner.setLanguage(val as LocalePreference)}
+    />
   </div>
-  <input
-    type="range"
-    class="w-full accent-df-accent"
-    min={MIN_DELAY_MS / 1000}
-    max="20"
-    step="0.5"
-    value={delaySeconds}
-    oninput={(event) => runner.saveSettings({ delayMs: Math.round(Number(event.currentTarget.value) * 1000) })}
-  />
-  <p class="mt-1 text-[11px] text-df-dim">{t('settings.delayHint', { min: MIN_DELAY_MS / 1000 })}</p>
+
+  <div class="border-t border-df-line pt-3">
+    <div class="flex items-center justify-between pb-1">
+      <span class="hud-label">{t('settings.speed')}</span>
+      <span class="glow-text font-mono text-sm font-semibold">{delaySeconds}s</span>
+    </div>
+    <div class="flex items-center justify-between pb-1.5 text-xs text-df-muted">
+      <span>{t('settings.delay')}</span>
+    </div>
+    <input
+      type="range"
+      class="w-full cursor-pointer accent-df-accent"
+      min={MIN_DELAY_MS / 1000}
+      max="20"
+      step="0.5"
+      value={delaySeconds}
+      oninput={(event) => runner.saveSettings({ delayMs: Math.round(Number(event.currentTarget.value) * 1000) })}
+    />
+    <p class="mt-1.5 text-[11px] text-df-dim">{t('settings.delayHint', { min: MIN_DELAY_MS / 1000 })}</p>
+  </div>
 </section>
 
 <section class="hud-panel divide-y divide-df-line px-3 py-1">
@@ -122,7 +126,7 @@ const running = $derived(!!runner.runningSite);
   />
 </section>
 
-<section class="hud-panel flex flex-col gap-2 p-3">
+<section class="hud-panel flex flex-col gap-2.5 p-3">
   <div class="hud-label">{t('settings.feed')}</div>
   <p class="text-[11px] text-df-dim">
     {t('settings.feedHint', { file: `${runner.site.feedKey}.json` })}
@@ -140,15 +144,15 @@ const running = $derived(!!runner.runningSite);
       {t('settings.feedLast', { time: lastSync, active: runner.feedSync.active, added: runner.feedSync.added })}
     </p>
   {/if}
-</section>
 
-<section class="hud-panel divide-y divide-df-line px-3 py-1">
-  <Toggle
-    label={t('settings.autoSync')}
-    hint={t('settings.autoSyncHint')}
-    checked={runner.settings.autoSyncFeed}
-    onchange={(value) => runner.saveSettings({ autoSyncFeed: value })}
-  />
+  <div class="border-t border-df-line pt-1">
+    <Toggle
+      label={t('settings.autoSync')}
+      hint={t('settings.autoSyncHint')}
+      checked={runner.settings.autoSyncFeed}
+      onchange={(value) => runner.saveSettings({ autoSyncFeed: value })}
+    />
+  </div>
 </section>
 
 <section class="hud-panel flex flex-col gap-2 p-3">

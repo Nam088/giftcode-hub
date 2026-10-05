@@ -158,7 +158,7 @@ export const vi: Record<MessageKey, string> = {
     'Mọi dữ liệu chỉ lưu trên máy này. Extension không gửi code, cookie hay thông tin tài khoản ra ngoài.',
   'settings.notice': 'Lưu ý',
   'settings.noticeBody':
-    'Đây là công cụ không chính thức, không liên kết với nhà phát hành. Extension chỉ điền và bấm trên trang đổi quà như bạn làm thủ công, không vượt captcha và không gọi API ẩn. Tự động hoá có thể trái điều khoản dịch vụ của nhà phát hành và dẫn tới khoá tài khoản. Bạn tự chịu trách nhiệm khi sử dụng.',
+    'Đây là công cụ cộng đồng, không liên kết với nhà phát hành. Extension chỉ điền và bấm trên trang đổi quà như bạn làm thủ công, không vượt captcha và không gọi API ẩn. Tự động hoá có thể trái điều khoản dịch vụ của nhà phát hành và dẫn tới khoá tài khoản. Bạn tự chịu trách nhiệm khi sử dụng.',
 
   'msg.noTab': 'Chưa mở trang redeem',
   'msg.notLoggedIn': 'Hãy đăng nhập trên trang redeem trước',

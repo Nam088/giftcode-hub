@@ -182,17 +182,32 @@ export async function openStoreRenderer({ extensionPath, scale = 2 }) {
       // Reload to ensure Svelte store initializes fresh with seeded state
       await sidepanelPage.reload();
       await sidepanelPage.waitForSelector('main');
-      await sidepanelPage.waitForTimeout(400);
+      await sidepanelPage.waitForTimeout(300);
 
-      // Switch to targeted tab
+      // Ensure language is set in the UI
+      const settingsNavBtn = sidepanelPage.locator('nav button').nth(3);
+      if (await settingsNavBtn.count()) {
+        await settingsNavBtn.click();
+        await sidepanelPage.waitForTimeout(200);
+        const langSelect = sidepanelPage.locator('#language');
+        if (await langSelect.count()) {
+          await sidepanelPage.selectOption('#language', locale);
+          await sidepanelPage.waitForTimeout(200);
+        }
+      }
+
+      // Switch to requested tab
       const tabButton = sidepanelPage.locator('nav button').nth(tabIdx);
       if (await tabButton.count()) {
         await tabButton.click();
-        await sidepanelPage.waitForTimeout(350);
+        await sidepanelPage.waitForTimeout(300);
       }
 
-      const panel = sidepanelPage.locator('div.flex.min-h-screen.flex-col');
-      const png = await panel.screenshot({ type: 'png' });
+      await sidepanelPage.setViewportSize(SIDEPANEL_SIZE);
+      const png = await sidepanelPage.screenshot({
+        type: 'png',
+        clip: { x: 0, y: 0, width: SIDEPANEL_SIZE.width, height: SIDEPANEL_SIZE.height },
+      });
       return `data:image/png;base64,${png.toString('base64')}`;
     },
 

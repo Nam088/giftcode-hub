@@ -159,7 +159,7 @@ export const en = {
     'All data stays on this device. The extension never sends codes, cookies or account data anywhere.',
   'settings.notice': 'Notice',
   'settings.noticeBody':
-    'Unofficial tool, not affiliated with any publisher. It only fills and clicks the redeem page like you would, never bypasses captchas and never calls hidden APIs. Automation may break the publisher terms and get an account restricted. Use at your own risk.',
+    'Community tool, not affiliated with any publisher. It only fills and clicks the redeem page like you would, never bypasses captchas and never calls hidden APIs. Automation may break the publisher terms and get an account restricted. Use at your own risk.',
 
   'msg.noTab': 'Redeem page not open',
   'msg.notLoggedIn': 'Log in on the redeem page first',
