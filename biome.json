@@ -8,7 +8,7 @@
       "!.chrome-profile",
       "!captures",
       "!node_modules",
-      "!tests/fixtures"
+      "!tests/fixtures", "!feed"
     ]
   },
   "formatter": {
