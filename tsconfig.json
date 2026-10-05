@@ -1,0 +1,7 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    // Node scripts import shared .ts files directly (type stripping needs the extension)
+    "allowImportingTsExtensions": true
+  }
+}

@@ -1,0 +1,46 @@
+name: Scrape gift codes
+
+on:
+  schedule:
+    # 01:17 UTC = 08:17 Vietnam time, once a day (off the hour to avoid the cron rush)
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scrape-codes
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Scripts are skipped: the scraper needs no WXT prepare or browser download
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - run: pnpm scrape
+
+      # Commit only when the code list changed; the scraper leaves updatedAt alone otherwise
+      - name: Commit feed
+        run: |
+          if git diff --quiet -- feed/; then
+            echo "No new codes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add feed/
+          git commit -m "chore(feed): update gift codes $(date -u +%Y-%m-%d)"
+          git push

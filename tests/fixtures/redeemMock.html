@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Redeem mock</title>
+  </head>
+  <body>
+    <!-- Mirrors the result plumbing of redeem.df.garena.sg/vi/cdkgarena.html (comm.js) -->
+    <div id="logined" class="logined"><span class="username">Tester</span></div>
+    <div class="main-box">
+      <div class="state state-before"><a href="javascript:void(0);" class="spr btn-signin">Đăng nhập</a></div>
+      <div class="state state-after show">
+        <input class="spr exc-input" type="text" />
+        <a href="javascript:void(0);" class="spr btn-exchange">Đổi</a>
+      </div>
+    </div>
+    <p class="super-tips" id="superTips"></p>
+    <div class="dia dia-tips" id="diaTips">
+      <a href="javascript:void(0);" class="btn-close"><i class="spr btn-close-i"></i></a>
+      <p>Sorry, you have not gained access to the test yet.</p>
+    </div>
+    <script>
+      // Same messages the vi locale shows; error_hint_* keys are shown raw on the real page
+      const responses = {
+        USED0001: 'error_hint_400072',
+        LIMIT001: 'Xin lỗi, tài khoản của bạn không thể đổi thêm CDKey của gói quà này.',
+        BAD00001: 'CDKey đã nhập không hợp lệ. Vui lòng thử lại.',
+        NET00001: 'Lỗi mạng, vui lòng thử lại sau',
+        SILENT01: null,
+      };
+      let toastBusy = false;
+      function setSuperTips(text) {
+        if (toastBusy) return;
+        toastBusy = true;
+        document.getElementById('superTips').textContent = text;
+        setTimeout(() => (toastBusy = false), 2200);
+      }
+      function setDiaTips(text) {
+        const dialog = document.getElementById('diaTips');
+        dialog.querySelector('p').textContent = text;
+        dialog.style.display = 'block';
+      }
+      document.querySelector('#diaTips .btn-close').addEventListener('click', () => {
+        document.getElementById('diaTips').style.display = 'none';
+      });
+      document.querySelector('.btn-exchange').addEventListener('click', () => {
+        const code = document.querySelector('.exc-input').value.trim();
+        if (!code) return;
+        setTimeout(() => {
+          if (!(code in responses)) {
+            setDiaTips('Đã nhận thành công! Vui lòng kiểm tra hộp thư trong game của bạn.');
+          } else if (responses[code] !== null) {
+            setSuperTips(responses[code]);
+          }
+        }, 500);
+      });
+    </script>
+  </body>
+</html>
