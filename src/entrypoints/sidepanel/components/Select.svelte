@@ -150,36 +150,48 @@ onMount(() => {
 
   <!-- Custom Dropdown Menu & Items -->
   {#if open}
-    <ul
-      class="hud-panel absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto border border-df-line-strong bg-df-panel/98 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.75)] backdrop-blur-md"
-      role="listbox"
+    <div
+      class="absolute top-full left-0 right-0 z-50 mt-1 border border-df-line-strong bg-df-panel/98 shadow-[0_8px_24px_rgba(0,0,0,0.75)] backdrop-blur-md"
     >
-      {#each options as opt (opt.value)}
-        {@const isSelected = opt.value === value}
-        <li
-          role="option"
-          aria-selected={isSelected}
-          class="group/item flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-semibold tracking-wider uppercase transition-all {isSelected
-            ? 'border-l-2 border-df-accent bg-df-accent/15 text-df-accent font-bold'
-            : 'text-df-muted hover:border-l-2 hover:border-df-accent/60 hover:bg-df-panel-2 hover:text-df-text hover:pl-3.5'}"
-          onclick={() => select(opt.value)}
-          onkeydown={(e) => e.key === 'Enter' && select(opt.value)}
-          tabindex="0"
-        >
-          <span class="truncate">{opt.label}</span>
-          {#if isSelected}
-            <span class="text-df-accent">
-              <svg viewBox="0 0 20 20" class="h-3.5 w-3.5" fill="currentColor">
-                <path
-                  fill-rule="evenodd"
-                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </span>
-          {/if}
-        </li>
-      {/each}
-    </ul>
+      <!-- HUD Corner Ticks -->
+      <span
+        class="pointer-events-none absolute -top-px -left-px h-2 w-2 border-t-2 border-l-2 border-df-accent"
+      ></span>
+      <span
+        class="pointer-events-none absolute -bottom-px -right-px h-2 w-2 border-b-2 border-r-2 border-df-accent"
+      ></span>
+
+      <ul
+        class="max-h-60 overflow-x-hidden overflow-y-auto py-1"
+        role="listbox"
+      >
+        {#each options as opt (opt.value)}
+          {@const isSelected = opt.value === value}
+          <li
+            role="option"
+            aria-selected={isSelected}
+            class="group/item flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-semibold tracking-wider uppercase transition-all {isSelected
+              ? 'border-l-2 border-df-accent bg-df-accent/15 font-bold text-df-accent'
+              : 'text-df-muted hover:border-l-2 hover:border-df-accent/60 hover:bg-df-panel-2 hover:pl-3.5 hover:text-df-text'}"
+            onclick={() => select(opt.value)}
+            onkeydown={(e) => e.key === 'Enter' && select(opt.value)}
+            tabindex="0"
+          >
+            <span class="truncate">{opt.label}</span>
+            {#if isSelected}
+              <span class="text-df-accent">
+                <svg viewBox="0 0 20 20" class="h-3.5 w-3.5" fill="currentColor">
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </div>
   {/if}
 </div>
