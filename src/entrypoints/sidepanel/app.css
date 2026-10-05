@@ -188,4 +188,14 @@ body {
     color: var(--color-df-accent);
     text-shadow: 0 0 12px rgb(15 247 150 / 0.45);
   }
+
+  select {
+    color-scheme: dark;
+  }
+  select option {
+    background-color: var(--color-df-panel);
+    color: var(--color-df-text);
+    padding: 8px 12px;
+    font-family: var(--font-df);
+  }
 }

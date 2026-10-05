@@ -10,6 +10,7 @@ import {
   tm,
 } from '@/lib/i18n/index.svelte';
 import { knownKey, MIN_DELAY_MS } from '@/lib/storage';
+import Select from '../components/Select.svelte';
 import Toggle from '../components/Toggle.svelte';
 import { runner } from '../runner.svelte';
 
@@ -57,16 +58,17 @@ const running = $derived(!!runner.runningSite);
 
 <section class="hud-panel p-3">
   <label class="hud-label mb-1.5 block" for="language">{t('settings.language')}</label>
-  <select
+  <Select
     id="language"
-    class="hud-input px-2 py-1.5 text-sm"
+    icon="language"
+    size="md"
     value={runner.settings.locale}
-    onchange={(event) => runner.setLanguage(event.currentTarget.value as LocalePreference)}
-  >
-    {#each LANGUAGE_OPTIONS as option (option)}
-      <option value={option}>{option === 'auto' ? t('settings.languageAuto') : LOCALE_NAMES[option]}</option>
-    {/each}
-  </select>
+    options={LANGUAGE_OPTIONS.map((opt) => ({
+      value: opt,
+      label: opt === 'auto' ? t('settings.languageAuto') : LOCALE_NAMES[opt],
+    }))}
+    onchange={(val) => runner.setLanguage(val as LocalePreference)}
+  />
 </section>
 
 <section class="hud-panel p-3">

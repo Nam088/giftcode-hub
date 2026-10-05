@@ -3,6 +3,7 @@ import { onMount } from 'svelte';
 import type { MessageKey } from '@/lib/i18n/en';
 import { t } from '@/lib/i18n/index.svelte';
 import { SITES } from '@/lib/sites';
+import Select from './components/Select.svelte';
 import { runner } from './runner.svelte';
 import HistoryTab from './tabs/HistoryTab.svelte';
 import RedeemTab from './tabs/RedeemTab.svelte';
@@ -85,18 +86,16 @@ const siteLocked = $derived(runner.runningSite !== undefined);
     <!-- Game and server: everything below is scoped to this choice -->
     <div class="px-3 pb-2">
       <label class="sr-only" for="site-select">{t('site.label')}</label>
-      <select
+      <Select
         id="site-select"
-        class="hud-input px-2 py-1 text-xs font-semibold tracking-wider uppercase disabled:opacity-50"
+        icon="globe"
+        size="sm"
         value={runner.settings.activeSite}
         disabled={siteLocked}
         title={siteLocked ? t('site.locked') : t('site.label')}
-        onchange={(event) => runner.setSite(event.currentTarget.value as typeof runner.settings.activeSite)}
-      >
-        {#each SITES as site (site.id)}
-          <option value={site.id}>{t(`site.${site.id}`)}</option>
-        {/each}
-      </select>
+        options={SITES.map((site) => ({ value: site.id, label: t(`site.${site.id}`) }))}
+        onchange={(val) => runner.setSite(val as typeof runner.settings.activeSite)}
+      />
     </div>
 
     <!-- Tabs -->
