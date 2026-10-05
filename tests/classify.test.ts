@@ -9,6 +9,8 @@ describe.each(SITES.map((site) => [site.id, site] as const))('%s result rules', 
     ['Erfolgreich abgeholt! Bitte überprüfe deine Post im Spiel.', 'success'],
     ['CDKey đã nhập không hợp lệ. Vui lòng thử lại.', 'invalid'],
     ['The CDKey entered is not valid. Please try again.', 'invalid'],
+    ['error_hint_400073', 'invalid'],
+    ['CD key pack configuration error.', 'invalid'],
     ['Xin lỗi, tài khoản của bạn không thể đổi thêm CDKey của gói quà này.', 'used'],
     ['You have already claimed this reward.', 'used'],
     ['error_hint_400072', 'used'],
@@ -24,7 +26,6 @@ describe.each(SITES.map((site) => [site.id, site] as const))('%s result rules', 
     'Lỗi mạng, vui lòng thử lại sau',
     'Network error. Please try again later.',
     'error_hint_400069',
-    'error_hint_400073',
   ])('treats %s as unknown so the job pauses', (message) => {
     expect(classify(site, message)).toBe('unknown');
   });

@@ -12,7 +12,7 @@ const LANGUAGE_FILES = [
 // Message keys the pages show for each outcome (from their response code tables)
 const KEYS: Record<string, string[]> = {
   success: ['lang5'],
-  invalid: ['lang12'],
+  invalid: ['lang12', 'error_hint_400073'],
   used: [
     'lang1',
     'error_hint_400067',

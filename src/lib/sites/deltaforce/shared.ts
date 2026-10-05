@@ -12,7 +12,7 @@ const anyOf = (texts: string[], extra: string[] = []) =>
  */
 export const DF_RESULT_RULES: ResultRule[] = [
   { pattern: anyOf(DF_MESSAGES.success), status: 'success' },
-  { pattern: anyOf(DF_MESSAGES.invalid), status: 'invalid' },
+  { pattern: anyOf(DF_MESSAGES.invalid, ['error_hint_400073']), status: 'invalid' },
   {
     pattern: anyOf(DF_MESSAGES.used, [
       'error_hint_40006[78]',
