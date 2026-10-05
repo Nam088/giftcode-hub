@@ -2,7 +2,7 @@
   "name": "giftcode-hub",
   "description": "Collect public gift codes daily and redeem them from a browser extension",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -21,7 +21,11 @@
     "e2e": "node scripts/e2e.ts",
     "scrape": "node scripts/scrape/index.ts",
     "gen:df-messages": "node scripts/gen-df-messages.ts",
-    "gen:icons": "node scripts/gen-icons.ts"
+    "gen:icons": "node scripts/gen-icons.ts",
+    "screenshots:raw": "node tools/capture-screenshots.mjs",
+    "screenshots:store": "node tools/capture-store-screenshots.mjs",
+    "promos:store": "node tools/capture-store-promos.mjs",
+    "assets:store": "pnpm screenshots:store && pnpm promos:store"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

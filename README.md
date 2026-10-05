@@ -22,12 +22,17 @@ The UI is available in Vietnamese and English (`src/lib/i18n`). It follows the b
 | Command | What it does |
 | --- | --- |
 | `pnpm dev` / `pnpm build` | Build the extension into `.output/` |
+| `pnpm zip` / `pnpm zip:firefox` | Package zip archives for Chrome Web Store and Firefox |
 | `pnpm browser` | Chrome for Testing with a persistent profile (`.chrome-profile/`) and the extension loaded |
 | `pnpm capture [label]` | Save HTML, screenshot and form summary of the open redeem tab into `captures/` |
 | `pnpm test` | Unit tests (Vitest) |
 | `pnpm e2e` | Full run of the built extension against `tests/fixtures/redeemMock.html`; the real site is never contacted |
 | `pnpm scrape` | Update `feed/<site>.json` from public code list pages |
 | `pnpm gen:df-messages` | Regenerate Delta Force result messages from the redeem pages |
+| `pnpm gen:icons` | Render pixel-perfect icons from flat SVG |
+| `pnpm screenshots:store` | Generate 5 Chrome Web Store screenshots (1280x800, 24-bit RGB) for EN & VI |
+| `pnpm promos:store` | Generate Chrome Web Store promo tiles (440x280 and 1400x560) for EN & VI |
+| `pnpm assets:store` | Run both store screenshot and promo generation scripts |
 | `pnpm lint` / `pnpm check` | Biome and svelte-check |
 
 ## Daily code feed
