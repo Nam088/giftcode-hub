@@ -4,7 +4,7 @@ export const en = {
   'app.title': 'Gift Code',
   'app.subtitle': 'Redeem terminal',
   'app.loading': 'Loading…',
-  'app.footer': 'Unofficial tool · Only for codes you may use',
+  'app.footer': 'Community tool · Only for codes you may use',
   'app.openRedeem': 'Open the redeem page',
 
   'conn.loggedIn': 'Logged in',
@@ -127,6 +127,8 @@ export const en = {
     'At least {min} seconds. The page drops a new message while the previous one shows (about 2 s), and going too fast can get the account limited.',
   'settings.allowBackground': 'Run in background',
   'settings.allowBackgroundHint': 'Keep redeeming even when switching away from the tab',
+  'settings.continueOnReview': 'Continue on unconfirmed results',
+  'settings.continueOnReviewHint': 'Do not pause the queue when encountering unknown errors',
   'settings.skipKnown': 'Skip processed codes',
   'settings.skipKnownHint':
     'Do not resend codes that already have a result on the same account and server',

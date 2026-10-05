@@ -4,7 +4,7 @@ export const vi: Record<MessageKey, string> = {
   'app.title': 'Gift Code',
   'app.subtitle': 'Redeem terminal',
   'app.loading': 'Đang tải…',
-  'app.footer': 'Công cụ không chính thức · Chỉ dùng cho code hợp lệ',
+  'app.footer': 'Công cụ cộng đồng · Chỉ dùng cho code hợp lệ',
   'app.openRedeem': 'Mở trang redeem',
 
   'conn.loggedIn': 'Đã đăng nhập',
@@ -127,6 +127,8 @@ export const vi: Record<MessageKey, string> = {
     'Tối thiểu {min} giây. Trang bỏ qua thông báo mới khi thông báo cũ còn hiện (khoảng 2 giây), và gửi quá nhanh có thể khiến tài khoản bị giới hạn.',
   'settings.allowBackground': 'Chạy khi ẩn tab',
   'settings.allowBackgroundHint': 'Tiếp tục đổi code kể cả khi bạn chuyển sang tab khác',
+  'settings.continueOnReview': 'Tiếp tục khi gặp kết quả lạ',
+  'settings.continueOnReviewHint': 'Không dừng tiến trình khi gặp lỗi không xác định',
   'settings.skipKnown': 'Bỏ qua code đã xử lý',
   'settings.skipKnownHint': 'Không gửi lại code đã có kết quả trên cùng tài khoản và server',
   'settings.mask': 'Che code khi xong lượt',

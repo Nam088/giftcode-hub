@@ -568,17 +568,21 @@ export class Runner {
           await this.#remember(siteId, job.account, item.code, status);
           await this.#saveJobs();
         } else {
-          job.items[index] = transition(current, 'unknown', outcome.message);
+          job.items[index] = transition(current, 'unknown', outcome.message || t('note.noMessage'));
           const reason: PauseReason =
             outcome.status === 'captcha'
               ? 'captcha'
               : outcome.status === 'rate_limited'
                 ? 'rate_limited'
                 : 'needs_review';
-          if (outcome.message) this.#pause(reason, outcome.message);
-          else this.#pause(reason, undefined, 'note.noMessage');
-          await this.#saveJobs();
-          break;
+          if (reason === 'needs_review' && this.settings.continueOnReview) {
+            await this.#saveJobs();
+          } else {
+            if (outcome.message) this.#pause(reason, outcome.message);
+            else this.#pause(reason, undefined, 'note.noMessage');
+            await this.#saveJobs();
+            break;
+          }
         }
 
         if (nextPendingIndex(job) !== -1) {

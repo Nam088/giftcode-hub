@@ -95,6 +95,12 @@ const running = $derived(!!runner.runningSite);
     onchange={(value) => runner.saveSettings({ allowBackground: value })}
   />
   <Toggle
+    label={t('settings.continueOnReview')}
+    hint={t('settings.continueOnReviewHint')}
+    checked={runner.settings.continueOnReview}
+    onchange={(value) => runner.saveSettings({ continueOnReview: value })}
+  />
+  <Toggle
     label={t('settings.skipKnown')}
     hint={t('settings.skipKnownHint')}
     checked={runner.settings.skipKnown}

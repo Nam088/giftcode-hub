@@ -11,6 +11,8 @@ describe.each(SITES.map((site) => [site.id, site] as const))('%s result rules', 
     ['The CDKey entered is not valid. Please try again.', 'invalid'],
     ['error_hint_400073', 'invalid'],
     ['CD key pack configuration error.', 'invalid'],
+    ['error_hint_400069', 'invalid'],
+    ['CD key redemption not yet available.', 'invalid'],
     ['Xin lỗi, tài khoản của bạn không thể đổi thêm CDKey của gói quà này.', 'used'],
     ['You have already claimed this reward.', 'used'],
     ['error_hint_400072', 'used'],
@@ -22,13 +24,12 @@ describe.each(SITES.map((site) => [site.id, site] as const))('%s result rules', 
     expect(classify(site, message)).toBe(status);
   });
 
-  it.each([
-    'Lỗi mạng, vui lòng thử lại sau',
-    'Network error. Please try again later.',
-    'error_hint_400069',
-  ])('treats %s as unknown so the job pauses', (message) => {
-    expect(classify(site, message)).toBe('unknown');
-  });
+  it.each(['Lỗi mạng, vui lòng thử lại sau', 'Network error. Please try again later.'])(
+    'treats %s as unknown so the job pauses',
+    (message) => {
+      expect(classify(site, message)).toBe('unknown');
+    },
+  );
 
   it('accepts codes with letters, digits and dashes', () => {
     expect(site.codeFormat.test('ABCD1234')).toBe(true);

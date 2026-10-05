@@ -16,6 +16,8 @@ export interface Settings {
   maskFinishedCodes: boolean;
   /** Keep running even when the redeem tab is hidden or backgrounded. */
   allowBackground: boolean;
+  /** Continue to next code instead of pausing when a result is unconfirmed or unknown. */
+  continueOnReview: boolean;
   /** Desktop notification when a job finishes or pauses on its own. */
   notify: boolean;
   /** Folder of the scraper feeds, each site reads `<base><feedKey>.json`. Empty disables it. */
@@ -65,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
   skipKnown: true,
   maskFinishedCodes: false,
   allowBackground: true,
+  continueOnReview: true,
   notify: true,
   feedBaseUrl: '',
   autoSyncFeed: true,
@@ -96,9 +99,13 @@ export function feedUrlFor(base: string, feedKey: string): string {
 }
 
 // Migrations from the single site version (v1). Exported for tests.
-type SettingsV1 = Omit<Settings, 'activeSite' | 'locale' | 'feedBaseUrl' | 'allowBackground'> & {
+type SettingsV1 = Omit<
+  Settings,
+  'activeSite' | 'locale' | 'feedBaseUrl' | 'allowBackground' | 'continueOnReview'
+> & {
   feedUrl?: string;
   allowBackground?: boolean;
+  continueOnReview?: boolean;
 };
 
 export function migrateSettingsV2(old: SettingsV1): Settings {
@@ -180,6 +187,7 @@ export function parseBackup(text: string): Backup {
       feedBaseUrl: settings?.feedBaseUrl ?? feedBaseFromUrl(settings?.feedUrl),
       delayMs: clampDelay(Number(settings?.delayMs) || DEFAULT_SETTINGS.delayMs),
       allowBackground: settings?.allowBackground ?? DEFAULT_SETTINGS.allowBackground,
+      continueOnReview: settings?.continueOnReview ?? DEFAULT_SETTINGS.continueOnReview,
     },
     // Older backups have keys without a site prefix
     knownCodes: migrateKnownCodesV2(data.knownCodes),
